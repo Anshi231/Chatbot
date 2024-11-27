@@ -44,17 +44,16 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
+            # Initialize the response as an empty string
             ai_response = ''
+
+            # Collect all chunks into ai_response
             for chunk in response:
                 if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
                     ai_content = chunk.choices[0].delta.content
                     ai_response += ai_content
-
-                    # Check if the response contains code blocks (```):
-                    if "```" in ai_content:
-                        ai_content = markdown.markdown(ai_content, extensions=["fenced_code"])
-
-                    await websocket.send_text(ai_content)
+                    
+            await websocket.send_text(ai_response)
 
             # Append full AI response to the chat log
             chat_log.append({'role': 'assistant', 'content': ai_response})
