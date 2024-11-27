@@ -5,6 +5,7 @@ import openai
 import os
 from dotenv import load_dotenv
 import markdown  # Ensure this import is included
+from typing import Annotated
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
