@@ -98,7 +98,7 @@ async def image_page(request: Request):
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
 
-    response = openai.images.generate(
+    response = openai.Image.create(
         prompt=user_input,
         n=1,
         size="256x256"
