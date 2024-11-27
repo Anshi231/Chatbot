@@ -18,9 +18,16 @@ templates = Jinja2Templates(directory="Templates")
 
 chat_responses = []
 
+from fastapi.responses import HTMLResponse
+
 @app.get("/", response_class=HTMLResponse)
 async def chat_page(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
+    headers = {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache"
+    }
+    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": []}, headers=headers)
+
 
 # Initialize chat log
 chat_log = [{'role': 'system',
