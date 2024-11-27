@@ -30,6 +30,10 @@
 </div>
 
 <script>
+   // Clear chat history for a fresh page load
+  window.onload = () => {
+      document.getElementById("chatHistory").innerHTML = "";
+  }; 
   var websocketString = '';
   if (window.location.hostname === '127.0.0.1') {
     websocketString = "ws://localhost:8000/ws";
