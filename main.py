@@ -68,3 +68,40 @@ async def chat(websocket: WebSocket):
             print(error_message)
             await websocket.send_text(error_message)
             break
+
+
+@app.post("/", response_class=HTMLResponse)
+async def chat(request: Request, user_input: Annotated[str, Form()]):
+
+    chat_log.append({'role': 'user', 'content': user_input})
+    chat_responses.append(user_input)
+
+    response = openai.chat.completions.create(
+        model='gpt-4',
+        messages=chat_log,
+        temperature=0.6
+    )
+
+    bot_response = response.choices[0].message.content
+    chat_log.append({'role': 'assistant', 'content': bot_response})
+    chat_responses.append(bot_response)
+
+    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
+
+
+@app.get("/image", response_class=HTMLResponse)
+async def image_page(request: Request):
+    return templates.TemplateResponse("image.html", {"request": request})
+
+
+@app.post("/image", response_class=HTMLResponse)
+async def create_image(request: Request, user_input: Annotated[str, Form()]):
+
+    response = openai.images.generate(
+        prompt=user_input,
+        n=1,
+        size="256x256"
+    )
+
+    image_url = response.data[0].url
+    return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
