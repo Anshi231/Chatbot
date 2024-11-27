@@ -33,26 +33,27 @@
     var userInput = document.getElementById("userInput");
     var chatHistory = document.getElementById("chatHistory");
 
-    ws.onmessage = function(event) {
+    ws.onmessage = function (event) {
         var message = event.data.trim();
-        var messageDiv = document.createElement("div");
 
-        // Check if the message contains code (using `<pre>` or `<code>`)
-        if (message.startsWith("<pre>") || message.startsWith("<code>")) {
-            var codeContainer = document.createElement("div");
-            codeContainer.innerHTML = message; // Render the message as HTML
-            chatHistory.appendChild(codeContainer);
+        // Check if the last message div exists
+        var lastMessageDiv = chatHistory.lastElementChild;
+
+        if (lastMessageDiv && lastMessageDiv.classList.contains("chat-message") && lastMessageDiv.classList.contains("ai-response")) {
+            // Append the message to the last AI response div
+            lastMessageDiv.textContent += message;
         } else {
-            // Regular message
-            messageDiv.textContent = message;
+            // Create a new message div if it's a new response
+            var messageDiv = document.createElement("div");
             messageDiv.className = "chat-message ai-response";
+            messageDiv.textContent = message;
             chatHistory.appendChild(messageDiv);
         }
 
-        chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll
+        chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to the bottom
     };
 
-    sendButton.onclick = function() {
+    sendButton.onclick = function () {
         var message = userInput.value.trim();
         if (message) {
             var userInputDiv = document.createElement("div");
