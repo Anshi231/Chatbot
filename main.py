@@ -28,6 +28,7 @@ async def chat_page(request: Request):
     return templates.TemplateResponse("home.html", {"request": request}, headers=headers)
 
 
+
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
     await websocket.accept()
@@ -52,7 +53,8 @@ async def chat(websocket: WebSocket):
                 if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
                     ai_content = chunk.choices[0].delta.content
                     ai_response += ai_content
-                    
+
+            # Send the full response to the frontend
             await websocket.send_text(ai_response)
 
             # Append full AI response to the chat log
