@@ -1,10 +1,10 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import openai
 import os
 from dotenv import load_dotenv
-import markdown  # Ensure this import is included
+from typing import Annotated
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
@@ -44,20 +44,15 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
-            ai_response = ''
+            # Stream the response to the client
             for chunk in response:
                 if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
                     ai_content = chunk.choices[0].delta.content
-                    ai_response += ai_content
-
-                    # Check if the response contains code blocks (```):
-                    if "```" in ai_content:
-                        ai_content = markdown.markdown(ai_content, extensions=["fenced_code"])
-
                     await websocket.send_text(ai_content)
 
             # Append full AI response to the chat log
-            chat_log.append({'role': 'assistant', 'content': ai_response})
+            full_response = "".join([chunk.choices[0].delta.content for chunk in response if 'delta' in chunk.choices[0]])
+            chat_log.append({'role': 'assistant', 'content': full_response})
 
         except WebSocketDisconnect:
             print("Client disconnected.")
