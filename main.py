@@ -29,15 +29,13 @@ chat_log = [{'role': 'system',
 
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
-
     await websocket.accept()
-
     while True:
-        user_input = await websocket.receive_text()
-        chat_log.append({'role': 'user', 'content': user_input})
-        chat_responses.append(user_input)
-
         try:
+            user_input = await websocket.receive_text()
+            chat_log.append({'role': 'user', 'content': user_input})
+
+            # Call OpenAI API with streaming enabled
             response = openai.ChatCompletion.create(
                 model='gpt-4',
                 messages=chat_log,
@@ -45,37 +43,35 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
+            # Initialize the response as an empty string
             ai_response = ''
 
+            # Collect all chunks into ai_response
             for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    ai_response += chunk.choices[0].delta.content
-                    await websocket.send_text(chunk.choices[0].delta.content)
-            chat_responses.append(ai_response)
+                print(chunk)  # Debugging: Print the chunk to inspect its structure
+                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
+                    ai_content = chunk.choices[0].delta.content
+                    ai_response += ai_content
+                else:
+                    error_message = f"Unexpected response format: {chunk}"
+                    print(error_message)  # Log the error
+                    await websocket.send_text("Error: Unexpected response from OpenAI")
+                    return
 
-        except Exception as e:
-            await websocket.send_text(f'Error: {str(e)}')
+            # Send the full response to the frontend
+            await websocket.send_text(ai_response)
+
+            # Append full AI response to the chat log
+            chat_log.append({'role': 'assistant', 'content': ai_response})
+
+        except WebSocketDisconnect:
+            print("Client disconnected.")
             break
-
-
-@app.post("/", response_class=HTMLResponse)
-async def chat(request: Request, user_input: Annotated[str, Form()]):
-
-    chat_log.append({'role': 'user', 'content': user_input})
-    chat_responses.append(user_input)
-
-    response = openai.chat.completions.create(
-        model='gpt-4',
-        messages=chat_log,
-        temperature=0.6
-    )
-
-    bot_response = response.choices[0].message.content
-    chat_log.append({'role': 'assistant', 'content': bot_response})
-    chat_responses.append(bot_response)
-
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
+        except Exception as e:
+            error_message = f"Error: {str(e)}"
+            print(error_message)
+            await websocket.send_text(error_message)
+            break
 
 @app.get("/image", response_class=HTMLResponse)
 async def image_page(request: Request):
