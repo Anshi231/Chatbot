@@ -46,20 +46,21 @@ async def chat(websocket: WebSocket):
             )
 
             ai_response = ""
-            previous_chunk = ""
+            buffer = ""  # To track the last chunk for proper concatenation
 
             # Stream response to frontend
             for chunk in response:
                 if "choices" in chunk and "delta" in chunk.choices[0]:
                     delta_content = chunk.choices[0].delta.get("content", "")
 
-                    # Check and add space if necessary
-                    if previous_chunk and not previous_chunk.endswith(" ") and not delta_content.startswith(" "):
+                    # Fix spacing: Add a space only if buffer does not end with a space and delta_content does not start with a space
+                    if buffer and not buffer[-1].isspace() and not delta_content.startswith((" ", "\n", ".", ",", ":", ";")):
                         delta_content = " " + delta_content
 
+                    buffer += delta_content
                     ai_response += delta_content
-                    previous_chunk = delta_content  # Update the last chunk
 
+                    # Send the chunk to the frontend
                     await websocket.send_text(delta_content)
 
             # Format bullet points if requested
