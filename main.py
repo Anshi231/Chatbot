@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
 from typing import Annotated
-from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 load_dotenv()
@@ -14,6 +13,8 @@ api_key = os.getenv('OPENAI_API_KEY')
 openai.api_key = api_key
 
 app = FastAPI()
+
+templates = Jinja2Templates(directory="templates")  # Added this line
 
 chat_responses = []
 
@@ -64,11 +65,10 @@ async def chat(websocket: WebSocket):
 
 @app.post("/", response_class=HTMLResponse)
 async def chat(request: Request, user_input: Annotated[str, Form()]):
-
     chat_log.append({'role': 'user', 'content': user_input})
     chat_responses.append(user_input)
 
-    response = openai.ChatCompletions.create(
+    response = openai.ChatCompletion.create(  # Corrected method name
         model='gpt-4',
         messages=chat_log,
         temperature=0.6
@@ -79,26 +79,18 @@ async def chat(request: Request, user_input: Annotated[str, Form()]):
     chat_responses.append(bot_response)
 
     return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-    
 
 @app.get("/image", response_class=HTMLResponse)
 async def image_page(request: Request):
     return templates.TemplateResponse("image.html", {"request": request})
 
-
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
-
     response = openai.Image.create(
         prompt=user_input,
         n=1,
         size="256x256"
     )
 
-    image_url = response.data[0].url
+    image_url = response['data'][0]['url']  # Ensure correct access to the response
     return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
-
-
-
-
-
