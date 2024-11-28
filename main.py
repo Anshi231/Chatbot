@@ -14,7 +14,7 @@ openai.api_key = api_key
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")  # Added this line
+templates = Jinja2Templates(directory="templates")  # Ensure this line is present
 
 chat_responses = []
 
@@ -27,6 +27,11 @@ chat_log = [
         )
     }
 ]
+
+# **Add this GET route to handle requests to the root URL**
+@app.get("/", response_class=HTMLResponse)
+async def chat_page(request: Request):
+    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
 
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
@@ -68,7 +73,7 @@ async def chat(request: Request, user_input: Annotated[str, Form()]):
     chat_log.append({'role': 'user', 'content': user_input})
     chat_responses.append(user_input)
 
-    response = openai.ChatCompletion.create(  # Corrected method name
+    response = openai.ChatCompletion.create(
         model='gpt-4',
         messages=chat_log,
         temperature=0.6
@@ -92,5 +97,5 @@ async def create_image(request: Request, user_input: Annotated[str, Form()]):
         size="256x256"
     )
 
-    image_url = response['data'][0]['url']  # Ensure correct access to the response
+    image_url = response['data'][0]['url']
     return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
