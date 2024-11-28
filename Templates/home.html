@@ -21,11 +21,11 @@
 </div>
 
 <script>
-    var websocketString = '';
-    if (window.location.hostname === '127.0.0.1') {
-        websocketString = "ws://localhost:8000/ws";
+    var websocketString;
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+        websocketString = "ws://127.0.0.1:8000/ws";
     } else {
-        websocketString = wss://${window.location.hostname}/ws;
+        websocketString = `wss://${window.location.hostname}/ws`;
     }
 
     var ws = new WebSocket(websocketString);
@@ -34,37 +34,60 @@
     var chatHistory = document.getElementById("chatHistory");
 
     ws.onmessage = function (event) {
-        var message = event.data.trim();
+        const message = event.data.trim();
 
-        // Check if the last message div exists
-        var lastMessageDiv = chatHistory.lastElementChild;
+        // Check if response contains bullet points or code
+        if (message.includes("```")) {
+            // Code block
+            const codeBlock = document.createElement("pre");
+            const codeElement = document.createElement("code");
+            codeElement.textContent = message.replace(/```/g, "");
+            codeBlock.appendChild(codeElement);
+            codeBlock.className = "chat-message ai-response";
+            chatHistory.appendChild(codeBlock);
 
-        if (lastMessageDiv && lastMessageDiv.classList.contains("chat-message") && lastMessageDiv.classList.contains("ai-response")) {
-            // Append the message to the last AI response div
-            lastMessageDiv.textContent += message;
+            // Highlight code
+            hljs.highlightElement(codeElement);
+        } else if (message.includes("\n")) {
+            // Bullet points
+            const bulletPoints = message.split("\n").filter(line => line.trim() !== "");
+            const listElement = document.createElement("ul");
+            listElement.className = "chat-message ai-response";
+
+            bulletPoints.forEach(point => {
+                const listItem = document.createElement("li");
+                listItem.textContent = point;
+                listElement.appendChild(listItem);
+            });
+
+            chatHistory.appendChild(listElement);
         } else {
-            // Create a new message div if it's a new response
-            var messageDiv = document.createElement("div");
+            // Regular text response
+            const messageDiv = document.createElement("div");
             messageDiv.className = "chat-message ai-response";
             messageDiv.textContent = message;
             chatHistory.appendChild(messageDiv);
         }
 
-        chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to the bottom
+        // Scroll to the bottom
+        chatHistory.scrollTop = chatHistory.scrollHeight;
     };
 
     sendButton.onclick = function () {
-        var message = userInput.value.trim();
+        const message = userInput.value.trim();
         if (message) {
-            var userInputDiv = document.createElement("div");
-            userInputDiv.className = "chat-message user-input";
-            userInputDiv.textContent = message;
-            chatHistory.appendChild(userInputDiv);
+            // Add user's message to chat
+            const userMessageDiv = document.createElement("div");
+            userMessageDiv.className = "chat-message user-input";
+            userMessageDiv.textContent = message;
+            chatHistory.appendChild(userMessageDiv);
 
+            // Scroll to the bottom
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
+            // Send to WebSocket
             ws.send(message);
-            userInput.value = "";
+            userInput.value = ""; // Clear input
         }
     };
 </script>
