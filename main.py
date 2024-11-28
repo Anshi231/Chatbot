@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 import openai
 import os
 from dotenv import load_dotenv
-import markdown  # Ensure this import is included
 from typing import Annotated
 
 load_dotenv()
@@ -17,7 +16,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="Templates")
 
 # Initialize chat log
-chat_log = [{'role': 'system', 'content': 'You are a Python tutor AI, completely dedicated to teaching Python concepts, best practices, and real-world applications.'}]
+chat_log = [{'role': 'system', 'content': 'You are a Python tutor AI, dedicated to teaching Python concepts, best practices, and real-world applications.'}]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -27,7 +26,6 @@ async def chat_page(request: Request):
         "Pragma": "no-cache"
     }
     return templates.TemplateResponse("home.html", {"request": request}, headers=headers)
-
 
 
 @app.websocket("/ws")
@@ -46,19 +44,21 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
-            # Initialize the response as an empty string
-            ai_response = ''
+            # Initialize response
+            ai_response = ""
 
-            # Collect all chunks into ai_response
+            # Stream response to frontend
             for chunk in response:
-                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
-                    ai_content = chunk.choices[0].delta.content
-                    ai_response += ai_content
+                if "choices" in chunk and "delta" in chunk.choices[0]:
+                    delta_content = chunk.choices[0].delta.get("content", "")
+                    ai_response += delta_content
+                    await websocket.send_text(delta_content)
 
-            # Send the full response to the frontend
-            await websocket.send_text(ai_response)
+            # Format bullet points for responses
+            if user_input.strip().lower().startswith("list") or user_input.strip().endswith("points"):
+                ai_response = "- " + "\n- ".join(ai_response.split("\n"))
 
-            # Append full AI response to the chat log
+            # Append full AI response to chat log
             chat_log.append({'role': 'assistant', 'content': ai_response})
 
         except WebSocketDisconnect:
@@ -69,30 +69,6 @@ async def chat(websocket: WebSocket):
             print(error_message)
             await websocket.send_text(error_message)
             break
-
-
-@app.post("/", response_class=HTMLResponse)
-async def chat(request: Request, user_input: Annotated[str, Form()]):
-
-    chat_log.append({'role': 'user', 'content': user_input})
-    chat_responses.append(user_input)
-
-    response = openai.chat.completions.create(
-        model='gpt-4',
-        messages=chat_log,
-        temperature=0.6
-    )
-
-    bot_response = response.choices[0].message.content
-    chat_log.append({'role': 'assistant', 'content': bot_response})
-    chat_responses.append(bot_response)
-
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
-
-@app.get("/image", response_class=HTMLResponse)
-async def image_page(request: Request):
-    return templates.TemplateResponse("image.html", {"request": request})
 
 
 @app.post("/image", response_class=HTMLResponse)
