@@ -4,7 +4,8 @@ from fastapi.templating import Jinja2Templates
 import openai
 import os
 from dotenv import load_dotenv
-import markdown  # Ensure this import is included
+import markdown
+from typing import Annotated # Ensure this import is included
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
