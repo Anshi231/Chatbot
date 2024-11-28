@@ -1,12 +1,11 @@
-from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
-from typing import Annotated
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, Request
 import openai
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
-import markdown
+from typing import Annotated
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
@@ -16,23 +15,20 @@ openai.api_key = api_key
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")
-
 chat_responses = []
 
-@app.get("/", response_class=HTMLResponse)
-async def chat_page(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
-
-chat_log = [{'role': 'system',
-             'content': 'You are a Python tutor AI, completely dedicated to teaching Python concepts, best practices, and real-world applications.'
-             }]
-
+chat_log = [
+    {
+        'role': 'system',
+        'content': (
+            'You are a Python tutor AI, completely dedicated to teaching Python concepts, '
+            'best practices, and real-world applications.'
+        )
+    }
+]
 
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
-
     await websocket.accept()
 
     while True:
@@ -41,7 +37,7 @@ async def chat(websocket: WebSocket):
         chat_responses.append(user_input)
 
         try:
-            response = openai.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model='gpt-4',
                 messages=chat_log,
                 temperature=0.6,
@@ -50,16 +46,21 @@ async def chat(websocket: WebSocket):
 
             ai_response = ''
 
+            # Iterate over the streamed chunks
             for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    ai_response += chunk.choices[0].delta.content
-                    await websocket.send_text(chunk.choices[0].delta.content)
+                # Check if 'content' is in the delta to avoid KeyError
+                if 'content' in chunk.choices[0].delta:
+                    content = chunk.choices[0].delta['content']
+                    ai_response += content  # Collect the full response
+                    await websocket.send_text(content)  # Stream to client
+
+            # After streaming, append the assistant's response to chat history
+            chat_log.append({'role': 'assistant', 'content': ai_response})
             chat_responses.append(ai_response)
 
         except Exception as e:
             await websocket.send_text(f'Error: {str(e)}')
             break
-
 
 @app.post("/", response_class=HTMLResponse)
 async def chat(request: Request, user_input: Annotated[str, Form()]):
@@ -67,7 +68,7 @@ async def chat(request: Request, user_input: Annotated[str, Form()]):
     chat_log.append({'role': 'user', 'content': user_input})
     chat_responses.append(user_input)
 
-    response = openai.chat.completions.create(
+    response = openai.ChatCompletions.create(
         model='gpt-4',
         messages=chat_log,
         temperature=0.6
@@ -78,7 +79,7 @@ async def chat(request: Request, user_input: Annotated[str, Form()]):
     chat_responses.append(bot_response)
 
     return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
+    
 
 @app.get("/image", response_class=HTMLResponse)
 async def image_page(request: Request):
@@ -88,7 +89,7 @@ async def image_page(request: Request):
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
 
-    response = openai.images.generate(
+    response = openai.Image.create(
         prompt=user_input,
         n=1,
         size="256x256"
