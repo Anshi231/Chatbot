@@ -33,6 +33,7 @@ async def chat(websocket: WebSocket):
     await websocket.accept()
     while True:
         try:
+            # Receive user input
             user_input = await websocket.receive_text()
             chat_log.append({'role': 'user', 'content': user_input})
 
@@ -44,21 +45,24 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
-            # Initialize response
             ai_response = ""
 
             # Stream response to frontend
             for chunk in response:
                 if "choices" in chunk and "delta" in chunk.choices[0]:
                     delta_content = chunk.choices[0].delta.get("content", "")
-                    ai_response += delta_content
+                    # Ensure spaces between words
+                    if delta_content and not delta_content.startswith(" "):
+                        ai_response += f" {delta_content}"
+                    else:
+                        ai_response += delta_content
                     await websocket.send_text(delta_content)
 
-            # Format bullet points for responses
+            # Format bullet points if requested
             if user_input.strip().lower().startswith("list") or user_input.strip().endswith("points"):
                 ai_response = "- " + "\n- ".join(ai_response.split("\n"))
 
-            # Append full AI response to chat log
+            # Append full AI response to the chat log
             chat_log.append({'role': 'assistant', 'content': ai_response})
 
         except WebSocketDisconnect:
@@ -73,12 +77,14 @@ async def chat(websocket: WebSocket):
 
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
-
-    response = openai.Image.create(
-        prompt=user_input,
-        n=1,
-        size="256x256"
-    )
-
-    image_url = response.data[0].url
-    return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
+    try:
+        response = openai.Image.create(
+            prompt=user_input,
+            n=1,
+            size="256x256"
+        )
+        image_url = response.data[0].url
+        return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
+    except Exception as e:
+        error_message = f"Error generating image: {str(e)}"
+        return templates.TemplateResponse("image.html", {"request": request, "error_message": error_message})
