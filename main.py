@@ -1,11 +1,10 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import openai
 import os
 from dotenv import load_dotenv
 import markdown  # Ensure this import is included
-from typing import Annotated
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
@@ -29,7 +28,6 @@ async def chat_page(request: Request):
     return templates.TemplateResponse("home.html", {"request": request}, headers=headers)
 
 
-
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
     await websocket.accept()
@@ -46,17 +44,17 @@ async def chat(websocket: WebSocket):
                 stream=True
             )
 
-            # Initialize the response as an empty string
             ai_response = ''
-
-            # Collect all chunks into ai_response
             for chunk in response:
                 if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
                     ai_content = chunk.choices[0].delta.content
                     ai_response += ai_content
 
-            # Send the full response to the frontend
-            await websocket.send_text(ai_response)
+                    # Check if the response contains code blocks (```):
+                    if "```" in ai_content:
+                        ai_content = markdown.markdown(ai_content, extensions=["fenced_code"])
+
+                    await websocket.send_text(ai_content)
 
             # Append full AI response to the chat log
             chat_log.append({'role': 'assistant', 'content': ai_response})
@@ -69,40 +67,3 @@ async def chat(websocket: WebSocket):
             print(error_message)
             await websocket.send_text(error_message)
             break
-
-
-@app.post("/", response_class=HTMLResponse)
-async def chat(request: Request, user_input: Annotated[str, Form()]):
-
-    chat_log.append({'role': 'user', 'content': user_input})
-    chat_responses.append(user_input)
-
-    response = openai.chat.completions.create(
-        model='gpt-4',
-        messages=chat_log,
-        temperature=0.6
-    )
-
-    bot_response = response.choices[0].message.content
-    chat_log.append({'role': 'assistant', 'content': bot_response})
-    chat_responses.append(bot_response)
-
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
-
-@app.get("/image", response_class=HTMLResponse)
-async def image_page(request: Request):
-    return templates.TemplateResponse("image.html", {"request": request})
-
-
-@app.post("/image", response_class=HTMLResponse)
-async def create_image(request: Request, user_input: Annotated[str, Form()]):
-
-    response = openai.Image.create(
-        prompt=user_input,
-        n=1,
-        size="256x256"
-    )
-
-    image_url = response.data[0].url
-    return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
