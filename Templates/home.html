@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h3>Add input to chat with Python Tutor</h3>
+    <h3 class="text-center">Add input to chat with Python Tutor</h3>
 
     <div>
         <div class="card text-center mt-3">
@@ -12,11 +12,12 @@
             </div>
         </div>
     </div>
-    <div class="container" id="footer">
-        <div class="input-group mb-3">
-            <input class="form-control" placeholder="Add input here" id="userInput">
-            <button class="btn btn-outline-primary" type="button" id="sendButton">Send</button>
-        </div>
+</div>
+
+<div class="container" id="footer">
+    <div class="input-group mb-3">
+        <input class="form-control" placeholder="Add input here" id="userInput">
+        <button class="btn btn-outline-primary" type="button" id="sendButton">Send</button>
     </div>
 </div>
 
@@ -36,26 +37,17 @@
     ws.onmessage = function (event) {
         var message = event.data.trim();
 
-        // Check if last message is from AI
         var lastMessageDiv = chatHistory.lastElementChild;
 
         if (lastMessageDiv && lastMessageDiv.classList.contains("ai-response")) {
-            // Append streamed content
             lastMessageDiv.innerHTML += message;
-
-            // Highlight code if any
-            if (message.includes("```")) {
-                lastMessageDiv.innerHTML = formatCode(message);
-            }
         } else {
-            // Create new AI response container
             var messageDiv = document.createElement("div");
             messageDiv.className = "chat-message ai-response";
             messageDiv.innerHTML = formatMessage(message);
             chatHistory.appendChild(messageDiv);
         }
 
-        // Auto-scroll to the bottom
         chatHistory.scrollTop = chatHistory.scrollHeight;
     };
 
@@ -89,7 +81,7 @@
 
     function formatCode(message) {
         const codeRegex = /```([\s\S]*?)```/g;
-        return message.replace(codeRegex, function(_, code) {
+        return message.replace(codeRegex, function (_, code) {
             return `<pre><code>${code}</code></pre>`;
         });
     }
