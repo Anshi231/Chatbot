@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
+import markdown
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
@@ -28,14 +29,15 @@ chat_log = [{'role': 'system',
 
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        try:
-            user_input = await websocket.receive_text()
-            chat_log.append({'role': 'user', 'content': user_input})
-            chat_responses.append(user_input)
 
-            # Call the OpenAI API with streaming enabled
+    await websocket.accept()
+
+    while True:
+        user_input = await websocket.receive_text()
+        chat_log.append({'role': 'user', 'content': user_input})
+        chat_responses.append(user_input)
+
+        try:
             response = openai.ChatCompletion.create(
                 model='gpt-4',
                 messages=chat_log,
@@ -44,37 +46,50 @@ async def chat(websocket: WebSocket):
             )
 
             ai_response = ''
-            for chunk in response:  # Use standard for loop
-                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
-                    ai_content = chunk.choices[0].delta.content
-                    ai_response += ai_content
-                    await websocket.send_text(ai_content)
 
-            # Add the full AI response to chat_log and chat_responses
-            chat_log.append({'role': 'assistant', 'content': ai_response})
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    ai_response += chunk.choices[0].delta.content
+                    await websocket.send_text(chunk.choices[0].delta.content)
             chat_responses.append(ai_response)
 
-        except WebSocketDisconnect:
-            print("Client disconnected.")
-            break
         except Exception as e:
-            error_message = f"Error: {str(e)}"
-            print(error_message)
-            await websocket.send_text(error_message)
+            await websocket.send_text(f'Error: {str(e)}')
             break
+
+
+@app.post("/", response_class=HTMLResponse)
+async def chat(request: Request, user_input: Annotated[str, Form()]):
+
+    chat_log.append({'role': 'user', 'content': user_input})
+    chat_responses.append(user_input)
+
+    response = openai.chat.completions.create(
+        model='gpt-4',
+        messages=chat_log,
+        temperature=0.6
+    )
+
+    bot_response = response.choices[0].message.content
+    chat_log.append({'role': 'assistant', 'content': bot_response})
+    chat_responses.append(bot_response)
+
+    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
+
 
 @app.get("/image", response_class=HTMLResponse)
 async def image_page(request: Request):
     return templates.TemplateResponse("image.html", {"request": request})
 
+
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
-    
-    response = openai.Image.create(
-        prompt = user_input,
+
+    response = openai.images.generate(
+        prompt=user_input,
         n=1,
         size="256x256"
     )
-    
-    image_url = response['data'][0]['url']
+
+    image_url = response.data[0].url
     return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
