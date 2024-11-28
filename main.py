@@ -14,7 +14,7 @@ openai.api_key = api_key
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")  # Ensure this line is present
+templates = Jinja2Templates(directory="Templates")  # Ensure this line is present
 
 chat_responses = []
 
