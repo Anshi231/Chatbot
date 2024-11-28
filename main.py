@@ -36,26 +36,32 @@ async def chat(websocket: WebSocket):
             chat_log.append({'role': 'user', 'content': user_input})
 
             # Call OpenAI API with streaming enabled
-            response = openai.ChatCompletion.create(
-                model='gpt-4',
-                messages=chat_log,
-                temperature=0.6,
-                stream=True
-            )
+            try:
+                response = openai.ChatCompletion.create(
+                    model='gpt-4',
+                    messages=chat_log,
+                    temperature=0.6,
+                    stream=True
+                )
+            except Exception as api_error:
+                error_message = f"OpenAI API error: {str(api_error)}"
+                print(error_message)
+                await websocket.send_text(error_message)
+                return
 
             # Initialize the response as an empty string
             ai_response = ''
 
-            # Collect all chunks into ai_response
+            # Process API response
             for chunk in response:
-                print(chunk)  # Debugging: Print the chunk to inspect its structure
-                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
+                print(chunk)  # Debugging: Log the chunk
+                if 'choices' in chunk and 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
                     ai_content = chunk.choices[0].delta.content
                     ai_response += ai_content
                 else:
                     error_message = f"Unexpected response format: {chunk}"
-                    print(error_message)  # Log the error
-                    await websocket.send_text("Error: Unexpected response from OpenAI")
+                    print(error_message)
+                    await websocket.send_text(error_message)
                     return
 
             # Send the full response to the frontend
