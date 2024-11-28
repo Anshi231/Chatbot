@@ -30,54 +30,52 @@ async def chat_page(request: Request):
 
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        try:
-            # Receive user input
-            user_input = await websocket.receive_text()
-            chat_log.append({'role': 'user', 'content': user_input})
 
-            # Call OpenAI API with streaming enabled
-            response = openai.ChatCompletion.create(
+    await websocket.accept()
+
+    while True:
+        user_input = await websocket.receive_text()
+        chat_log.append({'role': 'user', 'content': user_input})
+        chat_responses.append(user_input)
+
+        try:
+            response = openai.chat.completions.create(
                 model='gpt-4',
                 messages=chat_log,
                 temperature=0.6,
                 stream=True
             )
 
-            ai_response = ""
-            previous_char = None
+            ai_response = ''
 
-            # Stream response to frontend
             for chunk in response:
-                if "choices" in chunk and "delta" in chunk.choices[0]:
-                    delta_content = chunk.choices[0].delta.get("content", "")
-                    
-                    # Ensure proper spacing between chunks
-                    if previous_char is not None and not previous_char.isspace() and not delta_content.startswith(" "):
-                        delta_content = " " + delta_content
-                    
-                    ai_response += delta_content
-                    previous_char = delta_content[-1] if delta_content else previous_char
-                    
-                    await websocket.send_text(delta_content)
+                if chunk.choices[0].delta.content is not None:
+                    ai_response += chunk.choices[0].delta.content
+                    await websocket.send_text(chunk.choices[0].delta.content)
+            chat_responses.append(ai_response)
 
-            # Format bullet points if requested
-            if user_input.strip().lower().startswith("list") or user_input.strip().endswith("points"):
-                ai_response = "- " + "\n- ".join(ai_response.split("\n"))
-
-            # Append full AI response to the chat log
-            chat_log.append({'role': 'assistant', 'content': ai_response})
-
-        except WebSocketDisconnect:
-            print("Client disconnected.")
-            break
         except Exception as e:
-            error_message = f"Error: {str(e)}"
-            print(error_message)
-            await websocket.send_text(error_message)
+            await websocket.send_text(f'Error: {str(e)}')
             break
 
+
+@app.post("/", response_class=HTMLResponse)
+async def chat(request: Request, user_input: Annotated[str, Form()]):
+
+    chat_log.append({'role': 'user', 'content': user_input})
+    chat_responses.append(user_input)
+
+    response = openai.chat.completions.create(
+        model='gpt-4',
+        messages=chat_log,
+        temperature=0.6
+    )
+
+    bot_response = response.choices[0].message.content
+    chat_log.append({'role': 'assistant', 'content': bot_response})
+    chat_responses.append(bot_response)
+
+    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
 
 @app.post("/image", response_class=HTMLResponse)
 async def create_image(request: Request, user_input: Annotated[str, Form()]):
