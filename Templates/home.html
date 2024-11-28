@@ -36,21 +36,27 @@
     ws.onmessage = function (event) {
         var message = event.data.trim();
 
-        // Check if the last message div exists
+        // Check if last message is from AI
         var lastMessageDiv = chatHistory.lastElementChild;
 
-        if (lastMessageDiv && lastMessageDiv.classList.contains("chat-message") && lastMessageDiv.classList.contains("ai-response")) {
-            // Append the message to the last AI response div
-            lastMessageDiv.textContent += message;
+        if (lastMessageDiv && lastMessageDiv.classList.contains("ai-response")) {
+            // Append streamed content
+            lastMessageDiv.innerHTML += message;
+
+            // Highlight code if any
+            if (message.includes("```")) {
+                lastMessageDiv.innerHTML = formatCode(message);
+            }
         } else {
-            // Create a new message div if it's a new response
+            // Create new AI response container
             var messageDiv = document.createElement("div");
             messageDiv.className = "chat-message ai-response";
-            messageDiv.textContent = message;
+            messageDiv.innerHTML = formatMessage(message);
             chatHistory.appendChild(messageDiv);
         }
 
-        chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to the bottom
+        // Auto-scroll to the bottom
+        chatHistory.scrollTop = chatHistory.scrollHeight;
     };
 
     sendButton.onclick = function () {
@@ -67,5 +73,25 @@
             userInput.value = "";
         }
     };
+
+    function formatMessage(message) {
+        if (message.includes("```")) {
+            return formatCode(message);
+        } else if (message.startsWith("- ")) {
+            return `<ul>${message
+                .split("\n")
+                .map(line => `<li>${line.slice(2)}</li>`)
+                .join("")}</ul>`;
+        } else {
+            return message;
+        }
+    }
+
+    function formatCode(message) {
+        const codeRegex = /```([\s\S]*?)```/g;
+        return message.replace(codeRegex, function(_, code) {
+            return `<pre><code>${code}</code></pre>`;
+        });
+    }
 </script>
 {% endblock %}
