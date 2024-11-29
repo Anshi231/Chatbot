@@ -66,6 +66,22 @@
     }
   };
 
+  // Clear chat history when the page is unloaded
+  window.addEventListener("beforeunload", function () {
+    fetch("/clear_chat", { method: "POST" })
+      .then(response => response.json())
+      .then(data => {
+        console.log("Chat history cleared on page unload:", data.message);
+        // Optionally, clear chat visually
+        if (chatHistory) {
+          chatHistory.innerHTML = ''; // Clear frontend chat history
+        }
+      })
+      .catch(error => {
+        console.error("Error clearing chat on page unload:", error);
+      });
+  });
+
   ws.onmessage = function (event) {
     var response = event.data.trim();
 
