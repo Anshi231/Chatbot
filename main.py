@@ -1,101 +1,117 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, Request
 import openai
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 import os
 from dotenv import load_dotenv
-from typing import Annotated
 from fastapi.templating import Jinja2Templates
+from typing import Dict
 
+# Load environment variables
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 
 # Set OpenAI API key
 openai.api_key = api_key
 
+# Initialize FastAPI app
 app = FastAPI()
 
-templates = Jinja2Templates(directory="Templates")  # Ensure this line is present
+# Set up templates directory
+templates = Jinja2Templates(directory="Templates")
 
-chat_responses = []
+# Chat logs stored per client (simple implementation)
+client_chat_logs: Dict[str, Dict] = {}
 
-chat_log = [
-    {
-        'role': 'system',
-        'content': (
-            'You are a Python tutor AI, completely dedicated to teaching Python concepts, '
-            'best practices, and real-world applications.'
-        )
-    }
-]
-
-# **Add this GET route to handle requests to the root URL**
+# Route to serve the chat page
 @app.get("/", response_class=HTMLResponse)
 async def chat_page(request: Request):
+    # Retrieve the client_id based on the client's IP and port
+    client_id = request.client.host
+    chat_responses = client_chat_logs.get(client_id, {}).get('chat_responses', [])
     return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
 
+# WebSocket for handling live chat
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
     await websocket.accept()
+    client_id = websocket.client.host
+    if client_id not in client_chat_logs:
+        client_chat_logs[client_id] = {
+            'chat_log': [
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are a Python tutor AI, completely dedicated to teaching Python concepts, '
+                        'best practices, and real-world applications. When answering questions, always format lists as numbered or bulleted lists with proper indentation for clarity. Use Markdown for formatting where applicable. Also, whenever any code is there, always highlight it using triple backticks.'
+                    )
+                }
+            ],
+            'chat_responses': []
+        }
 
-    while True:
-        user_input = await websocket.receive_text()
-        chat_log.append({'role': 'user', 'content': user_input})
-        chat_responses.append(user_input)
+    client_data = client_chat_logs[client_id]
 
-        try:
+    try:
+        while True:
+            user_input = await websocket.receive_text()
+            client_data['chat_log'].append({'role': 'user', 'content': user_input})
+
+            # Call OpenAI API
             response = openai.ChatCompletion.create(
                 model='gpt-4',
-                messages=chat_log,
+                messages=client_data['chat_log'],
                 temperature=0.6,
                 stream=True
             )
 
             ai_response = ''
 
-            # Iterate over the streamed chunks
+            # Collect all chunks into ai_response
             for chunk in response:
-                # Check if 'content' is in the delta to avoid KeyError
-                if 'content' in chunk.choices[0].delta:
-                    content = chunk.choices[0].delta['content']
-                    ai_response += content  # Collect the full response
-                    await websocket.send_text(content)  # Stream to client
+                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
+                    ai_content = chunk.choices[0].delta.content
+                    ai_response += ai_content
 
-            # After streaming, append the assistant's response to chat history
-            chat_log.append({'role': 'assistant', 'content': ai_response})
-            chat_responses.append(ai_response)
+            # Send the complete response to the frontend
+            await websocket.send_text(ai_response)
 
-        except Exception as e:
-            await websocket.send_text(f'Error: {str(e)}')
-            break
+            # Append full AI response to the chat log
+            client_data['chat_log'].append({'role': 'assistant', 'content': ai_response})
 
-@app.post("/", response_class=HTMLResponse)
-async def chat(request: Request, user_input: Annotated[str, Form()]):
-    chat_log.append({'role': 'user', 'content': user_input})
-    chat_responses.append(user_input)
+            # Also update chat_responses to display in the frontend
+            client_data['chat_responses'].append({'role': 'user', 'content': user_input})  # Add user's input
+            client_data['chat_responses'].append({'role': 'assistant', 'content': ai_response})  # Add AI response
 
-    response = openai.ChatCompletion.create(
-        model='gpt-4',
-        messages=chat_log,
-        temperature=0.6
-    )
+    except WebSocketDisconnect:
+        print(f"Client {client_id} disconnected.")
+    except Exception as e:
+        error_message = f"Error: {str(e)}"
+        print(error_message)
+        await websocket.send_text(error_message)
 
-    bot_response = response.choices[0].message.content
-    chat_log.append({'role': 'assistant', 'content': bot_response})
-    chat_responses.append(bot_response)
-
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
-
+# Route to serve the image generation page
 @app.get("/image", response_class=HTMLResponse)
 async def image_page(request: Request):
-    return templates.TemplateResponse("image.html", {"request": request})
+    return templates.TemplateResponse("image.html", {"request": request, "image_url": None})
 
-@app.post("/image", response_class=HTMLResponse)
-async def create_image(request: Request, user_input: Annotated[str, Form()]):
-    response = openai.Image.create(
-        prompt=user_input,
-        n=1,
-        size="256x256"
-    )
+# Route to handle image generation based on user input
+@app.post("/image")
+async def generate_image(request: Request, user_input: str = Form(...)):
+    try:
+        # Call OpenAI API for image generation (DALL·E model)
+        response = openai.Image.create(
+            prompt=user_input,
+            n=1,
+            size="512x512"
+        )
 
-    image_url = response['data'][0]['url']
-    return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
+        # Get the image URL from the response
+        image_url = response['data'][0]['url']
+
+        # Return the image generation page with the image URL
+        return templates.TemplateResponse("image.html", {"request": request, "image_url": image_url})
+
+    except Exception as e:
+        error_message = f"Error generating image: {str(e)}"
+        print(error_message)
+        return templates.TemplateResponse("image.html", {"request": request, "image_url": None, "error_message": error_message})
