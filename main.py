@@ -125,3 +125,20 @@ async def generate_image(request: Request, user_input: str = Form(...)):
         error_message = f"Error generating image: {str(e)}"
         print(error_message)
         return templates.TemplateResponse("image.html", {"request": request, "image_url": None, "error_message": error_message})
+
+# Route to clear chat history
+@app.post("/clear_chat")
+async def clear_chat():
+    global chat_log, chat_responses
+    chat_log = [
+        {
+            'role': 'system',
+            'content': (
+                "You are a Python tutor AI, completely dedicated to teaching Python concepts, "
+                "best practices, and real-world applications. When answering questions, always format your responses "
+                "in a structured format with headings and subheadings. Use Markdown for formatting."
+            )
+        }
+    ]
+    chat_responses.clear()
+    return {"message": "Chat history cleared successfully!"}
