@@ -2,7 +2,7 @@
 
 <div class="container mt-5">
   <h3>
-    Add input to generate images from a personal chatbot
+    Add input to generate images from your personal chatbot
   </h3>
 
   <div>
@@ -11,18 +11,26 @@
         Image Generation
       </div>
       <div class="card-body">
+        {% if image_url %}
         <div>
-          <img src="{{image_url}}" alt="image">
+          <img src="{{ image_url }}" alt="Generated Image" class="img-fluid" style="max-width: 100%; height: auto;">
         </div>
+        {% else %}
+        <p class="text-muted">No image generated yet. Enter a prompt to generate one!</p>
+        {% endif %}
+        {% if error_message %}
+        <div class="alert alert-danger mt-3">
+          {{ error_message }}
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <form class="container" id="footer" action="/image" method="POST">
+  <form class="container mt-4" action="/image" method="POST">
     <div class="input-group mb-3">
-      <input class="form-control" placeholder="Add input here" name="user_input">
-      <button class="btn btn-outline-primary" type="submit">Send</button>
+      <input class="form-control" type="text" name="user_input" placeholder="Describe the image you want to generate" required>
+      <button class="btn btn-outline-primary" type="submit">Generate Image</button>
     </div>
   </form>
-
 </div>
