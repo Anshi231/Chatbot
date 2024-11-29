@@ -41,6 +41,7 @@ chat_log = [
             "- Tuples\n"
             "- Dictionaries\n"
             "- Sets\n\n"
+            "In any case don't change the format style. Always use bullet points, heading, and code snippets when applicable."
             "Continue the format for other sections. Always use bullet points, headings, and code snippets when applicable."
         )
     }
