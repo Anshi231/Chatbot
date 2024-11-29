@@ -1,132 +1,170 @@
 {% include 'layout.html' %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python Tutor Chatbot</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css" rel="stylesheet">
-    <style>
-        .chat-history {
-            max-height: 500px;
-            overflow-y: auto;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-        }
-        .user-input {
-            background-color: #e6f2ff;
-            margin-bottom: 12px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .ai-response {
-            background-color: #f0f0f0;
-            margin-bottom: 12px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        pre {
-            background-color: #f4f4f4;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        code {
-            color: #333;
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-4" style="max-width: 80%; margin: auto;">
-        <h2 class="text-center mb-4">Chat with Your AI Python Tutor</h2>
+<div class="container mt-4" style="max-width: 80%; margin: auto;">
+  <h2 class="text-center mb-4" style="font-weight: bold;">
+    Chat with Your AI Python Tutor
+  </h2>
 
-        <div class="card">
-            <div class="card-header">
-                <h4>Chat History:</h4>
-            </div>
-            <div id="chatHistory" class="card-body chat-history">
-                {% for response in chat_responses %}
-                    {% if response.type == 'user' %}
-                        <div class="chat-message user-input">
-                            {{ response.content }}
-                        </div>
-                    {% elif response.type == 'ai' %}
-                        <div class="chat-message ai-response">
-                            {{ response.content | safe }}
-                        </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-            
-            <div class="card-footer">
-                <div class="input-group">
-                    <input type="text" id="userInput" class="form-control" placeholder="Type your message...">
-                    <button id="sendButton" class="btn btn-primary">Send</button>
-                </div>
-            </div>
-        </div>
+  <div class="card mt-4">
+    <div class="card-header">
+      <h4>Chat History:</h4>
     </div>
+    <div class="card-body chat-history" id="chatHistory" style="max-height: 500px; overflow-y: auto; font-size: 16px; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
+      <!-- Chat messages will be inserted here -->
+      {% for response in chat_responses %}
+      <div class="{{ 'chat-message user-input' if loop.index0 is even else 'chat-message ai-response' }}" style="margin-bottom: 12px; padding: 8px; border-radius: 5px;">
+        {{ response }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-    <script>
-        // WebSocket connection
-        const socket = new WebSocket('ws://localhost:8000/ws');
-        const chatHistory = document.getElementById('chatHistory');
-        const userInput = document.getElementById('userInput');
-        const sendButton = document.getElementById('sendButton');
+ <div class="container mt-3" id="footer">
+  <div class="input-group">
+    <input class="form-control" placeholder="Type your message here..." id="userInput" style="height: 50px; font-size: 16px; border-radius: 5px;">
+    <button class="btn btn-primary" type="button" id="sendButton" style="font-size: 16px;">Send</button>
+  </div>
+</div>
 
-        // Markdown rendering
-        marked.setOptions({
-            highlight: function(code, lang) {
-                return hljs.highlightAuto(code).value;
-            }
-        });
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  var websocketString = '';
+  if (window.location.hostname === '127.0.0.1') {
+    websocketString = "ws://localhost:8000/ws";
+  } else {
+    websocketString = `wss://${window.location.hostname}/ws`;
+  }
 
-        socket.onmessage = function(event) {
-            // Render markdown for AI responses
-            const formattedResponse = marked.parse(event.data);
-            
-            const aiResponseDiv = document.createElement('div');
-            aiResponseDiv.className = 'chat-message ai-response';
-            aiResponseDiv.innerHTML = formattedResponse;
-            
-            chatHistory.appendChild(aiResponseDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        };
+  var ws = new WebSocket(websocketString);
 
-        // Send message on button click
-        sendButton.addEventListener('click', sendMessage);
+  var sendButton = document.getElementById("sendButton");
+  var userInput = document.getElementById("userInput");
+  var chatHistory = document.getElementById("chatHistory");
 
-        // Send message on Enter key
-        userInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+  sendButton.onclick = function () {
+    var message = userInput.value.trim();
+    if (message) {
+      // Create a new div for the user's input
+      var userInputDiv = document.createElement("div");
+      userInputDiv.className = "chat-message user-input";
+      userInputDiv.textContent = message;
+      chatHistory.appendChild(userInputDiv);
 
-        function sendMessage() {
-            const message = userInput.value.trim();
-            if (message) {
-                // Create user message div
-                const userMessageDiv = document.createElement('div');
-                userMessageDiv.className = 'chat-message user-input';
-                userMessageDiv.textContent = message;
-                
-                chatHistory.appendChild(userMessageDiv);
-                
-                // Send message via WebSocket
-                socket.send(message);
-                
-                // Clear input
-                userInput.value = '';
-                
-                // Scroll to bottom
-                chatHistory.scrollTop = chatHistory.scrollHeight;
-            }
-        }
-    </script>
-</body>
-</html>
+      // Create a new "Typing..." indicator
+      var typingIndicatorDiv = document.createElement("div");
+      typingIndicatorDiv.className = "chat-message ai-response";
+      typingIndicatorDiv.textContent = "Typing...";
+      typingIndicatorDiv.id = "typingIndicator"; // Assign an id
+      chatHistory.appendChild(typingIndicatorDiv);
+
+      // Scroll to the bottom of the chat history
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+
+      // Send the message to the backend via WebSocket
+      ws.send(message);
+      userInput.value = ''; // Clear the input field
+    }
+  };
+
+  ws.onmessage = function (event) {
+    var response = event.data.trim();
+
+    // Find and remove the "Typing..." indicator
+    var typingIndicator = document.getElementById("typingIndicator");
+    if (typingIndicator) {
+      typingIndicator.remove();
+    }
+
+    // Create a new div for the AI response
+    var aiResponseDiv = document.createElement("div");
+    aiResponseDiv.className = "chat-message ai-response";
+    aiResponseDiv.innerHTML = marked.parse(response); // Render Markdown
+    chatHistory.appendChild(aiResponseDiv);
+
+    // Scroll to the bottom of the chat history
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  };
+
+  ws.onerror = function (error) {
+    console.error("WebSocket Error: ", error);
+  };
+
+  ws.onclose = function () {
+    console.log("WebSocket connection closed.");
+  };
+</script>
+
+<style>
+  .chat-history {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chat-message {
+    font-size: 16px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 75%;
+    word-wrap: break-word;
+  }
+
+  .chat-message.user-input {
+    background-color: #e7f3ff;
+    align-self: flex-end;
+  }
+
+  .chat-message.ai-response {
+    background-color: #f1f1f1;
+    align-self: flex-start;
+  }
+
+    #footer {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    background-color: white;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #userInput {
+    height: 45px;
+    font-size: 14px;
+    flex: 1; /* Allow input to take most of the space */
+    margin-right: 10px;
+    border-radius: 5px; /* Add spacing between input and button */
+  }
+
+  #sendButton {
+    height: 45px;
+    font-size: 14px;
+    min-width: 80px; 
+  }
+
+  @media (max-width: 768px) {
+    #footer {
+      width: 95%; /* Reduce width slightly for smaller screens */
+    }
+
+    .chat-message {
+      font-size: 14px; /* Reduce font size for mobile */
+      padding: 8px; /* Adjust padding for better readability */
+    }
+
+    .chat-message.user-input {
+      max-width: 90%; /* Increase the width for better text wrapping */
+    }
+
+    .chat-message.ai-response {
+      max-width: 90%; /* Increase the width for better text wrapping */
+    }
+  }
+
+</style>
