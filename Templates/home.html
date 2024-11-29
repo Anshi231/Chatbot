@@ -121,28 +121,50 @@
 
     #footer {
     position: fixed;
-    bottom: 20px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    width: 70%;
+    width: 90%;
     background-color: white;
-    padding: 15px;
+    padding: 10px;
     border-radius: 10px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
   }
 
   #userInput {
-    height: 50px;
-    font-size: 16px;
+    height: 45px;
+    font-size: 14px;
     flex: 1; /* Allow input to take most of the space */
-    margin-right: 10px; /* Add spacing between input and button */
+    margin-right: 10px;
+    border-radius: 5px; /* Add spacing between input and button */
   }
 
   #sendButton {
-    height: 50px;
-    font-size: 16px;
+    height: 45px;
+    font-size: 14px;
+    min-width: 80px; 
   }
+
+  @media (max-width: 768px) {
+    #footer {
+      width: 95%; /* Reduce width slightly for smaller screens */
+    }
+
+    .chat-message {
+      font-size: 14px; /* Reduce font size for mobile */
+      padding: 8px; /* Adjust padding for better readability */
+    }
+
+    .chat-message.user-input {
+      max-width: 90%; /* Increase the width for better text wrapping */
+    }
+
+    .chat-message.ai-response {
+      max-width: 90%; /* Increase the width for better text wrapping */
+    }
+  }
+
 </style>
