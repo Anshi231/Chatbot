@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form, Request
 import openai
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
@@ -25,16 +25,15 @@ client_chat_logs: Dict[str, Dict] = {}
 # Route to serve the chat page
 @app.get("/", response_class=HTMLResponse)
 async def chat_page(request: Request):
-    # Retrieve the client_id based on the client's IP and port
-    client_id = request.client.host
-    chat_responses = client_chat_logs.get(client_id, {}).get('chat_responses', [])
+    # Retrieve chat_responses from session or initialize empty list
+    chat_responses = []
     return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
 
 # WebSocket for handling live chat
 @app.websocket("/ws")
 async def chat(websocket: WebSocket):
     await websocket.accept()
-    client_id = websocket.client.host
+    client_id = f"{websocket.client.host}:{websocket.client.port}"
     if client_id not in client_chat_logs:
         client_chat_logs[client_id] = {
             'chat_log': [
