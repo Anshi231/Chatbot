@@ -69,12 +69,6 @@
   ws.onmessage = function (event) {
     var response = event.data.trim();
 
-    // Find and remove the "Typing..." indicator
-    var typingIndicator = document.getElementById("typingIndicator");
-    if (typingIndicator) {
-      typingIndicator.remove();
-    }
-
     // Create a new div for the AI response
     var aiResponseDiv = document.createElement("div");
     aiResponseDiv.className = "chat-message ai-response";
