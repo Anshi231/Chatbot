@@ -4,6 +4,8 @@ from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
 load_dotenv()
@@ -15,41 +17,61 @@ openai.api_key = api_key
 # Initialize FastAPI app
 app = FastAPI()
 
-# Set up templates directory
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Set up templates and static files directories
 templates = Jinja2Templates(directory="Templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Chat responses and logs
-chat_responses = []
-chat_log = [
-    {
-        'role': 'system',
-        'content': (
-            "You are a Python tutor AI, completely dedicated to teaching Python concepts, "
-            "best practices, and real-world applications. When answering questions, always format your responses "
-            "in a structured format with headings and subheadings. Use Markdown for formatting. "
-            "Example of a response format:\n\n"
-            "### Sure, here's a structured roadmap to learn Python:\n\n"
-            "#### Understanding the Basics\n"
-            "- Installation of Python\n"
-            "- Understanding Python syntax\n"
-            "- Variables and data types in Python\n\n"
-            "#### Flow Control\n"
-            "- Conditional statements: `if`, `elif`, `else`\n"
-            "- Looping: `for`, `while`\n\n"
-            "#### Data Structures\n"
-            "- Lists\n"
-            "- Tuples\n"
-            "- Dictionaries\n"
-            "- Sets\n\n"
-            "Continue the format for other sections. Always use bullet points, headings, and code snippets when applicable."
-        )
-    }
-]
+class ChatManager:
+    def __init__(self):
+        self.chat_responses = []
+        self.chat_log = [
+            {
+                'role': 'system',
+                'content': (
+                    "You are a Python tutor AI, completely dedicated to teaching Python concepts, "
+                    "best practices, and real-world applications. Respond with clear, structured explanations. "
+                    "Use markdown formatting for readability. Provide detailed, accurate information."
+                )
+            }
+        ]
+
+    def add_user_message(self, message):
+        self.chat_responses.append({
+            'type': 'user',
+            'content': message
+        })
+        self.chat_log.append({'role': 'user', 'content': message})
+
+    def add_ai_message(self, message):
+        self.chat_responses.append({
+            'type': 'ai',
+            'content': message
+        })
+        self.chat_log.append({'role': 'assistant', 'content': message})
+
+    def get_chat_responses(self):
+        return self.chat_responses
+
+# Create a global chat manager
+chat_manager = ChatManager()
 
 # Route to serve the chat page
 @app.get("/", response_class=HTMLResponse)
 async def chat_page(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request, "chat_responses": chat_responses})
+    return templates.TemplateResponse("home.html", {
+        "request": request, 
+        "chat_responses": chat_manager.get_chat_responses()
+    })
 
 # WebSocket for handling live chat
 @app.websocket("/ws")
@@ -57,43 +79,46 @@ async def chat(websocket: WebSocket):
     await websocket.accept()
     while True:
         try:
+            # Receive user input
             user_input = await websocket.receive_text()
-            chat_log.append({'role': 'user', 'content': user_input})
+            
+            # Add user message to chat manager
+            chat_manager.add_user_message(user_input)
 
-            # Send "Typing..." feedback to the frontend (handled by JS now)
-            # await websocket.send_text("Typing...")  # Removed
+            try:
+                # Call OpenAI API
+                response = openai.ChatCompletion.create(
+                    model='gpt-4',
+                    messages=chat_manager.chat_log,
+                    temperature=0.2,
+                    stream=True
+                )
 
-            # Call OpenAI API
-            response = openai.ChatCompletion.create(
-                model='gpt-4',
-                messages=chat_log,
-                temperature=0.2,
-                stream=True
-            )
+                # Collect AI response
+                ai_response = ''
+                for chunk in response:
+                    if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
+                        ai_content = chunk.choices[0].delta.content
+                        ai_response += ai_content
+                        # Optional: Send partial responses
+                        # await websocket.send_text(ai_content)
 
-            ai_response = ''
+                # Add full AI response to chat manager
+                chat_manager.add_ai_message(ai_response)
 
-            # Collect all chunks into ai_response
-            for chunk in response:
-                if 'delta' in chunk.choices[0] and 'content' in chunk.choices[0].delta:
-                    ai_content = chunk.choices[0].delta.content
-                    ai_response += ai_content
+                # Send complete response to client
+                await websocket.send_text(ai_response)
 
-            # Send the complete response to the frontend
-            await websocket.send_text(ai_response)
-
-            # Append full AI response to the chat log
-            chat_log.append({'role': 'assistant', 'content': ai_response})
-
-            # Also update chat_responses to display in the frontend
-            chat_responses.append(user_input)  # Add user's input to the chat history
-            chat_responses.append(ai_response)  # Add AI response to the chat history
+            except Exception as api_error:
+                error_message = f"OpenAI API Error: {str(api_error)}"
+                print(error_message)
+                await websocket.send_text(error_message)
 
         except WebSocketDisconnect:
             print("Client disconnected.")
             break
         except Exception as e:
-            error_message = f"Error: {str(e)}"
+            error_message = f"WebSocket Error: {str(e)}"
             print(error_message)
             await websocket.send_text(error_message)
             break
