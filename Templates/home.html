@@ -1,43 +1,44 @@
 {% include 'layout.html' %}
 
-<div class="container mt-5">
-  <h3>
-    Add input to chat with personal chatbot
-  </h3>
+<div class="container mt-4" style="max-width: 70%; margin: auto;">
+  <h2 class="text-center">
+    Chat with Your Python Tutor AI
+  </h2>
 
-  <div>
-    <div class="card text-center mt-3">
-      <div class="card-header">
-        Chat History:
+  <div class="card mt-4">
+    <div class="card-header">
+      <h4>Chat History:</h4>
+    </div>
+    <div class="card-body chat-history" id="chatHistory" style="max-height: 500px; overflow-y: auto; font-size: 16px; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
+      <!-- Render chat history dynamically -->
+      {% for message in chat_responses %}
+      <div class="chat-message {{ 'user-input' if message['role'] == 'user' else 'ai-response' }}">
+        {{ message['content'] | safe }}
       </div>
-      <div class="card-body chat-history" id="chatHistory">
-        <!-- auto populate here -->
-        {% for response in chat_responses %}
-
-        <div class="{{ 'chat-message user-input' if loop.index0 is even else 'chat-message ai-response' }}">
-          {{ response }}
-        </div>
-        {% endfor %}
-      </div>
+      {% endfor %}
     </div>
   </div>
 
-  <div class="container" id="footer">
-    <div class="input-group mb-3">
-      <input class="form-control" placeholder="Add input here" id="userInput">
-      <button class="btn btn-outline-primary" type="button" id="sendButton">Send</button>
+  <div class="container mt-3" id="footer">
+    <div class="input-group">
+      <input class="form-control" placeholder="Type your message here..." id="userInput" style="height: 45px; font-size: 16px;">
+      <button class="btn btn-primary" type="button" id="sendButton" style="font-size: 16px;">Send</button>
     </div>
   </div>
-
 </div>
 
-<script>
+<!-- Include marked.js for Markdown parsing -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- Include highlight.js for code syntax highlighting -->
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
 
+<script>
   var websocketString = '';
   if (window.location.hostname === '127.0.0.1') {
     websocketString = "ws://localhost:8000/ws";
   } else {
-    websocketString=`wss://${window.location.hostname}/ws`
+    websocketString = `wss://${window.location.hostname}/ws`;
   }
 
   var ws = new WebSocket(websocketString);
@@ -45,47 +46,118 @@
   var sendButton = document.getElementById("sendButton");
   var userInput = document.getElementById("userInput");
   var chatHistory = document.getElementById("chatHistory");
-  var lastUserMessageDiv = null; // Keep track of the last user message div
-  var isNewUserInput = true; // Flag to track when a new user input happens
 
-  ws.onmessage = function(event) {
-    var message = event.data.trim(); // Trim whitespace from the message
-
-    // Check if it's a continuation of the AI's last message or a new one
-    if (lastUserMessageDiv && !isNewUserInput) {
-      var shouldAddSpace = true;
-      var noPrependSpaceChars = [',', '.', '!', '?', ';', ':', "'"];
-
-      if (noPrependSpaceChars.includes(message.charAt(0))) {
-          shouldAddSpace = false;
-      }
-
-      lastUserMessageDiv.textContent += (shouldAddSpace ? " " : "") + message;
-    } else {
-      // It's either a new user input or the first chunk of AI response for the latest input
-      var messageDiv = document.createElement("div");
-      messageDiv.className = "chat-message ai-response"; // Assign class for styling
-      messageDiv.textContent = message;
-      chatHistory.appendChild(messageDiv);
-      lastUserMessageDiv = messageDiv; // Update the reference to the last message div
-      isNewUserInput = false; // Reset the flag as the AI response starts
-    }
-  };
-
-  sendButton.onclick = function() {
+  sendButton.onclick = function () {
     var message = userInput.value.trim();
     if (message) {
-      var userInputDiv = document.createElement("div");
-      userInputDiv.className = "chat-message user-input"; // Use user-input class for user messages
-      userInputDiv.textContent = message;
-      chatHistory.appendChild(userInputDiv);
+      // Add user input to chat history
+      appendMessage(message, "user-input");
 
+      // Add a "Typing..." indicator
+      var typingIndicatorDiv = document.createElement("div");
+      typingIndicatorDiv.className = "chat-message ai-response";
+      typingIndicatorDiv.textContent = "Typing...";
+      typingIndicatorDiv.id = "typingIndicator"; // Assign an id
+      chatHistory.appendChild(typingIndicatorDiv);
+
+      // Scroll to the bottom of the chat history
       chatHistory.scrollTop = chatHistory.scrollHeight;
 
+      // Send the message to the backend via WebSocket
       ws.send(message);
-      userInput.value = "";
-      isNewUserInput = true; // Set the flag as it's a new user input
-      lastUserMessageDiv = null; // Prepare for the next message
+      userInput.value = ""; // Clear the input field
     }
   };
+
+  ws.onmessage = function (event) {
+    var response = event.data.trim();
+
+    // Remove the "Typing..." indicator
+    var typingIndicator = document.getElementById("typingIndicator");
+    if (typingIndicator) {
+      typingIndicator.remove();
+    }
+
+    // Add AI response to chat history
+    appendMessage(response, "ai-response");
+  };
+
+  ws.onerror = function (error) {
+    console.error("WebSocket Error: ", error);
+  };
+
+  ws.onclose = function () {
+    console.log("WebSocket connection closed.");
+  };
+
+  // Append a new message to the chat history
+  function appendMessage(message, type) {
+    var messageDiv = document.createElement("div");
+    messageDiv.className = `chat-message ${type}`;
+    messageDiv.innerHTML = marked.parse(message); // Parse Markdown
+    chatHistory.appendChild(messageDiv);
+
+    // Apply syntax highlighting if necessary
+    hljs.highlightAll();
+
+    // Scroll to the bottom
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
+
+  // Parse and style existing chat messages on page load
+  document.addEventListener("DOMContentLoaded", function () {
+    const aiMessages = document.querySelectorAll(".chat-message.ai-response");
+    aiMessages.forEach(function (messageDiv) {
+      const originalText = messageDiv.textContent;
+      messageDiv.innerHTML = marked.parse(originalText);
+    });
+    hljs.highlightAll();
+  });
 </script>
+
+<style>
+  .chat-history {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chat-message {
+    font-size: 16px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 70%;
+    word-wrap: break-word;
+  }
+
+  .chat-message.user-input {
+    background-color: #e7f3ff;
+    align-self: flex-end;
+  }
+
+  .chat-message.ai-response {
+    background-color: #f1f1f1;
+    align-self: flex-start;
+  }
+
+  #footer {
+    position: fixed;
+    bottom: 20px;
+    left: 15%;
+    width: 70%;
+    background-color: white;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+
+  #userInput {
+    height: 45px;
+    font-size: 16px;
+  }
+
+  #sendButton {
+    height: 45px;
+    font-size: 16px;
+  }
+</style>
