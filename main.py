@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse
 import os
 from dotenv import load_dotenv
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
@@ -28,7 +27,6 @@ app.add_middleware(
 
 # Set up templates and static files directories
 templates = Jinja2Templates(directory="Templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Chat responses and logs
 class ChatManager:
