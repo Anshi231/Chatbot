@@ -1,75 +1,102 @@
-{% include 'layout.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat with Your Python Tutor AI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    .chat-history {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 14px;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+    }
 
-<div class="container mt-4" style="max-width: 50%; margin: auto;">
-  <h3 class="text-center" style="font-size: 18px; font-weight: bold;">
-    Chat with Your Python Tutor AI
-  </h3>
+    .chat-message {
+      font-size: 14px;
+      padding: 8px;
+      border-radius: 8px;
+      max-width: 70%;
+      word-wrap: break-word;
+    }
 
-  <div class="card mt-3">
-    <div class="card-header" style="padding: 8px; font-size: 14px;">
-      Chat History:
-    </div>
-    <div class="card-body chat-history" id="chatHistory" style="max-height: 300px; overflow-y: auto; font-size: 14px; padding: 10px; background-color: #f9f9f9; border-radius: 8px;">
-      {% for message in chat_responses %}
-      <div class="chat-message {{ 'user-input' if message['role'] == 'user' else 'ai-response' }}" style="margin-bottom: 5px; padding: 8px; border-radius: 8px;">
-        {{ message['content'] }}
+    .chat-message.user-input {
+      background-color: #e7f3ff;
+      align-self: flex-end;
+    }
+
+    .chat-message.ai-response {
+      background-color: #f1f1f1;
+      align-self: flex-start;
+    }
+
+    #footer {
+      position: fixed;
+      bottom: 10px;
+      left: 25%;
+      width: 50%;
+      background-color: white;
+      padding: 5px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    #userInput {
+      height: 35px;
+      font-size: 14px;
+    }
+
+    #sendButton {
+      height: 35px;
+      font-size: 14px;
+      padding: 5px 10px;
+    }
+
+    @media (max-width: 768px) {
+      #footer {
+        left: 5%;
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4" style="max-width: 50%; margin: auto;">
+    <h3 class="text-center" style="font-size: 18px; font-weight: bold;">Chat with Your Python Tutor AI</h3>
+
+    <div class="card mt-3">
+      <div class="card-header" style="padding: 8px; font-size: 14px;">Chat History:</div>
+      <div class="card-body chat-history" id="chatHistory">
+        <!-- Chat messages will appear here -->
       </div>
-      {% endfor %}
+    </div>
+
+    <div class="container mt-3" id="footer">
+      <div class="input-group">
+        <input 
+          class="form-control" 
+          placeholder="Type your message here..." 
+          id="userInput" 
+          aria-label="Message input"
+        />
+        <button class="btn btn-primary" type="button" id="sendButton">Send</button>
+      </div>
     </div>
   </div>
 
-  <div class="container mt-3" id="footer" style="padding: 5px;">
-    <div class="input-group">
-      <input class="form-control" placeholder="Type your message here..." id="userInput" style="height: 35px; font-size: 14px; padding: 5px;">
-      <button class="btn btn-primary" type="button" id="sendButton" style="font-size: 14px; padding: 5px 10px;">Send</button>
-    </div>
-  </div>
-</div>
+  <script>
+    document.getElementById('sendButton').addEventListener('click', function () {
+      const userInputField = document.getElementById('userInput');
+      const userMessage = userInputField.value.trim();
 
-<style>
-  .chat-history {
-    display: flex;
-    flex-direction: column;
-    gap: 5px; /* Reduced gap */
-  }
+      if (userMessage === '') return; // Prevent sending empty messages
 
-  .chat-message {
-    font-size: 14px; /* Reduced from 16px */
-    padding: 8px; /* Reduced from 10px */
-    border-radius: 8px;
-    max-width: 70%;
-    word-wrap: break-word;
-  }
-
-  .chat-message.user-input {
-    background-color: #e7f3ff;
-    align-self: flex-end;
-  }
-
-  .chat-message.ai-response {
-    background-color: #f1f1f1;
-    align-self: flex-start;
-  }
-
-  #footer {
-    position: fixed;
-    bottom: 10px; /* Reduced from 20px */
-    left: 25%; /* Adjusted for reduced container size */
-    width: 50%; /* Matches container width */
-    background-color: white;
-    padding: 5px; /* Reduced padding */
-    border-radius: 8px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1); /* Reduced shadow intensity */
-  }
-
-  #userInput {
-    height: 35px; /* Reduced height */
-    font-size: 14px; /* Reduced font size */
-  }
-
-  #sendButton {
-    height: 35px; /* Reduced height */
-    font-size: 14px; /* Reduced font size */
-    padding: 5px 10px; /* Reduced padding */
-  }
-</style>
+      // Append user's message to the chat history
+      const chatHistory = document.getElementById('chatHistory');
+      const userMessageDiv = document
